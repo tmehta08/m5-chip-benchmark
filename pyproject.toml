@@ -1,0 +1,10 @@
+[project]
+name = "m5-chip-test"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "marimo>=0.23.4",
+    "torch>=2.11.0",
+]
