@@ -7,34 +7,6 @@ import numpy as np
 import pandas as pd
 
 
-def system_info():
-    print("=" * 56)
-    print("SYSTEM")
-    print("=" * 56)
-    print(f"  Python:    {platform.python_version()}")
-    print(f"  Machine:   {platform.machine()}")
-
-    try:
-        chip = subprocess.run(
-            ["sysctl", "-n", "machdep.cpu.brand_string"],
-            capture_output=True, text=True
-        ).stdout.strip() or "Apple Silicon"
-        print(f"  Chip:      {chip}")
-    except Exception:
-        pass
-
-    try:
-        ram_bytes = int(subprocess.run(
-            ["sysctl", "-n", "hw.memsize"],
-            capture_output=True, text=True
-        ).stdout.strip())
-        print(f"  RAM:       {ram_bytes / 1024**3:.0f} GB")
-    except Exception:
-        pass
-
-    print(f"  CPU cores: {multiprocessing.cpu_count()} logical")
-    print()
-
 
 def run(label, fn):
     print(f"  {label} ... ", end="", flush=True)
@@ -87,8 +59,62 @@ def bench_pandas():
     return result.shape
 
 
+def save_results(chip, ram, cores, t_cpu, t_mm, gflops, t_bw, gb_s, t_pd):
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    content = f"""# M5 Chip Benchmark Results
+
+**Run:** {timestamp}
+**Chip:** {chip}
+**RAM:** {ram} GB
+**CPU cores:** {cores} logical
+
+## Results
+
+| Benchmark | Time | Score |
+|---|---|---|
+| CPU single-core (prime sieve, n=10M) | {t_cpu:.3f}s | — |
+| NumPy matmul (float32 4096×4096) | {t_mm:.3f}s | {gflops:.1f} GFLOPS |
+| Memory bandwidth (float32, 1 GB copy) | {t_bw:.3f}s | {gb_s:.1f} GB/s |
+| Pandas groupby (10M rows, 200 groups) | {t_pd:.3f}s | — |
+"""
+    with open("results.md", "w") as f:
+        f.write(content)
+    print("  Results saved to results.md")
+
+
+def get_system_info():
+    chip, ram = "Apple Silicon", 0
+    try:
+        chip = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True, text=True
+        ).stdout.strip() or chip
+    except Exception:
+        pass
+    try:
+        ram = int(subprocess.run(
+            ["sysctl", "-n", "hw.memsize"],
+            capture_output=True, text=True
+        ).stdout.strip()) // 1024 ** 3
+    except Exception:
+        pass
+    return chip, ram
+
+
 def main():
-    system_info()
+    chip, ram = get_system_info()
+    cores = multiprocessing.cpu_count()
+
+    print("=" * 56)
+    print("SYSTEM")
+    print("=" * 56)
+    print(f"  Python:    {platform.python_version()}")
+    print(f"  Machine:   {platform.machine()}")
+    print(f"  Chip:      {chip}")
+    print(f"  RAM:       {ram} GB")
+    print(f"  CPU cores: {cores} logical")
+    print()
 
     print("=" * 56)
     print("BENCHMARKS")
@@ -111,6 +137,8 @@ def main():
     print(f"  Memory bandwidth:  {t_bw:.3f}s   →  {gb_s:.1f} GB/s")
     print(f"  Pandas groupby:    {t_pd:.3f}s")
     print()
+
+    save_results(chip, ram, cores, t_cpu, t_mm, gflops, t_bw, gb_s, t_pd)
 
 
 if __name__ == "__main__":
